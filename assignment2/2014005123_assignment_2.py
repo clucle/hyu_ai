@@ -1,6 +1,7 @@
 import re
 import nltk
-from nltk.corpus import stopwords
+
+from konlpy.tag import Twitter;
 
 
 # https://github.com/chandong83/python_hangul_check_function
@@ -11,32 +12,25 @@ def is_hangul(text):
 # state : 0 negative / 1 positive
 def train(text, state):
     if is_hangul(text):
-        pass
-        # train_hangul(text, state)
+        train_hangul(text, state)
     else:
         train_not_hangul(text, state)
 
 
+t = Twitter()
+
+
 def train_hangul(text, state):
-    print(text)
+    tokens = t.pos(text)
+    pair_word_tag_list = nltk.pos_tag(tokens)
+    print(pair_word_tag_list)
 
 
 def train_not_hangul(text, state):
-    # 소문자로 처리
     text = text.lower()
-    stop_words = set(stopwords.words('english'))
-    stemmer = nltk.stem.PorterStemmer()
     words = nltk.word_tokenize(text)
-    words_filtered = []
-
-    for w in words:
-        if w not in stop_words:
-            words_filtered.append(stemmer.stem(w))
-    # print(text)
-    # print(words_filtered)
-    tags = nltk.pos_tag(words_filtered)
-    print(text)
-    print(tags)
+    pair_word_tag_list = nltk.pos_tag(words)
+    print(pair_word_tag_list)
 
 
 with open("ratings_train.txt", encoding="utf-8") as f:
@@ -50,3 +44,4 @@ with open("ratings_train.txt", encoding="utf-8") as f:
         label_movie = split[2]
 
         train(document_movie, label_movie)
+
