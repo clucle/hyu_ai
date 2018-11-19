@@ -15,8 +15,8 @@ sudo apt-get install python3.6
 sudo apt-get install g++ openjdk-8-jdk python-dev python3-dev
 
 # virtual env
-apt-get install python3-venv
-virtualenv -p python3 venv_2014005123
+sudo apt-get install python3-venv
+# 이미 생성 해둠 virtualenv -p python3 venv_2014005123
 source venv_2014005123/bin/activate
 
 # stopwords down
