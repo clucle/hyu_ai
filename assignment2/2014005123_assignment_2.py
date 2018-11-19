@@ -3,7 +3,7 @@ import nltk
 from decimal import Decimal
 from collections import defaultdict
 from konlpy.tag import Twitter
-
+from nltk.corpus import stopwords
 
 word_ko_dict = defaultdict(list)
 word_not_ko_dict = defaultdict(list)
@@ -30,8 +30,7 @@ t = Twitter()
 
 
 def train_hangul(text, state):
-    pair_word_tag_list = t.pos(text)
-
+    pair_word_tag_list = t.pos(text, norm=True, stem=True)
     for _word, tag in pair_word_tag_list:
         if _word not in word_ko_dict:
             word_ko_dict[_word].append(0)
@@ -43,10 +42,19 @@ def train_hangul(text, state):
             word_ko_dict[_word][1] += 1
 
 
+stop_words = set(stopwords.words('english'))
+stemmer = nltk.stem.PorterStemmer()
+
+
 def train_not_hangul(text, state):
     text = text.lower()
     words = nltk.word_tokenize(text)
-    pair_word_tag_list = nltk.pos_tag(words)
+    words_filtered = []
+
+    for w in words:
+        if w not in stop_words:
+            words_filtered.append(stemmer.stem(w))
+    pair_word_tag_list = nltk.pos_tag(words_filtered)
 
     for _word, tag in pair_word_tag_list:
         if _word not in word_not_ko_dict:
@@ -66,14 +74,26 @@ def classify(text):
         return classify_not_hangul(text)
 
 
+ignore_ko_tag = ['Suffix', 'Josa', 'Punctuation']
+
+
 def classify_hangul(text):
-    pair_word_tag_list = t.pos(text)
+    pair_word_tag_list = t.pos(text, norm=True, stem=True)
     pos = prob_pos
     neg = prob_neg
+
+    length = pair_word_tag_list.__len__()
+    power = start_power
+
     for _word, tag in pair_word_tag_list:
+        power += (1 / length) * inc_power
+        if tag in ignore_ko_tag:
+            continue
         if _word in word_ko_dict:
-            pos += Decimal(word_ko_dict[_word][1] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()
-            neg += Decimal(word_ko_dict[_word][0] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()
+            pos += (Decimal(
+                word_ko_dict[_word][1] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()) * Decimal(power)
+            neg += (Decimal(
+                word_ko_dict[_word][0] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()) * Decimal(power)
 
     if pos > neg:
         return '1'
@@ -89,8 +109,10 @@ def classify_not_hangul(text):
     neg = prob_neg
     for _word, tag in pair_word_tag_list:
         if _word in word_not_ko_dict:
-            pos += Decimal(word_not_ko_dict[_word][1] / (word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
-            neg += Decimal(word_not_ko_dict[_word][0] / (word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
+            pos += Decimal(
+                word_not_ko_dict[_word][1] / (word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
+            neg += Decimal(
+                word_not_ko_dict[_word][0] / (word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
 
     if pos > neg:
         return '1'
@@ -100,8 +122,8 @@ def classify_not_hangul(text):
 
 print("training start")
 with open("ratings_train.txt", encoding="utf-8") as f:
+    f.readline()
     for line in f:
-
         if line[-1] is "\n":
             line = line[:-1]
 
@@ -118,20 +140,15 @@ with open("ratings_train.txt", encoding="utf-8") as f:
 
 print("training end")
 
-# for word, value in word_ko_dict.items():
-#     print(word, value[0], value[1])
-# for word, value in word_not_ko_dict.items():
-#     print(word, value[0], value[1])
-
 prob_pos = Decimal(cnt_positive / (cnt_positive + cnt_negative))
 prob_neg = Decimal(cnt_negative / (cnt_positive + cnt_negative))
 
-print(prob_pos)
-print(prob_neg)
+print("classify start")
 
-print("classify..")
+threshold = 0.8
+start_power = 1
+inc_power = 1.2
 
-threshold = 0.1
 for key in word_ko_dict:
     word_ko_dict[key][0] += threshold
     word_ko_dict[key][1] += threshold
@@ -139,58 +156,22 @@ for key in word_not_ko_dict:
     word_not_ko_dict[key][0] += threshold
     word_not_ko_dict[key][1] += threshold
 
-
 result_cnt = 0
 result_correct = 0
-with open("ratings_valid.txt", encoding="utf-8") as f:
-    for line in f:
-        if line[-1] is "\n":
-            line = line[:-1]
+with open("ratings_test.txt", encoding="utf-8") as f:
+    header = f.readline()
 
-        split = line.split("\t")
-        id_movie = split[0]
-        document_movie = split[1]
-        label_movie = split[2]
+    with open("ratings_result.txt", 'w', encoding="utf-8") as result_f:
+        result_f.write(header)
+        for line in f:
+            if line[-1] is "\n":
+                line = line[:-1]
 
-        result_cnt += 1
-        if label_movie == classify(document_movie):
-            result_correct += 1
-            # print("OK : ", document_movie, label_movie)
-        else:
-            print("NO : ", document_movie, label_movie)
-            if is_hangul(document_movie):
-                tmp = t.pos(document_movie)
-                pos = prob_pos
-                neg = prob_neg
-                for _word, tag in tmp:
-                    if _word in word_ko_dict:
-                        print(_word, Decimal(
-                            word_ko_dict[_word][1] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10(),
-                              Decimal(
-                                  word_ko_dict[_word][0] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10())
-                        pos += Decimal(
-                            word_ko_dict[_word][1] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()
-                        neg += Decimal(
-                            word_ko_dict[_word][0] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()
-                print(pos, neg)
-            else:
-                text = document_movie.lower()
-                words = nltk.word_tokenize(document_movie)
-                pair_word_tag_list = nltk.pos_tag(words)
-                pos = prob_pos
-                neg = prob_neg
-                for _word, tag in pair_word_tag_list:
-                    if _word in word_not_ko_dict:
-                        print(_word, Decimal(
-                            word_not_ko_dict[_word][1] / (
-                                        word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10(), Decimal(
-                            word_not_ko_dict[_word][0] / (
-                                        word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10())
-                        pos += Decimal(word_not_ko_dict[_word][1] / (
-                                    word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
-                        neg += Decimal(word_not_ko_dict[_word][0] / (
-                                    word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
-                print(pos, neg)
+            split = line.split("\t")
+            id_movie = split[0]
+            document_movie = split[1]
+            label_movie = classify(document_movie)
 
-print(result_cnt)
-print(result_correct)
+            result_f.write("{} {} {}\n".format(id_movie, document_movie, label_movie))
+
+print("classify end")
