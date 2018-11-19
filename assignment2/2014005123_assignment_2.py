@@ -130,6 +130,16 @@ print(prob_pos)
 print(prob_neg)
 
 print("classify..")
+
+threshold = 0.1
+for key in word_ko_dict:
+    word_ko_dict[key][0] += threshold
+    word_ko_dict[key][1] += threshold
+for key in word_not_ko_dict:
+    word_not_ko_dict[key][0] += threshold
+    word_not_ko_dict[key][1] += threshold
+
+
 result_cnt = 0
 result_correct = 0
 with open("ratings_valid.txt", encoding="utf-8") as f:
@@ -145,9 +155,42 @@ with open("ratings_valid.txt", encoding="utf-8") as f:
         result_cnt += 1
         if label_movie == classify(document_movie):
             result_correct += 1
-            print("OK : ", document_movie, label_movie)
+            # print("OK : ", document_movie, label_movie)
         else:
             print("NO : ", document_movie, label_movie)
+            if is_hangul(document_movie):
+                tmp = t.pos(document_movie)
+                pos = prob_pos
+                neg = prob_neg
+                for _word, tag in tmp:
+                    if _word in word_ko_dict:
+                        print(_word, Decimal(
+                            word_ko_dict[_word][1] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10(),
+                              Decimal(
+                                  word_ko_dict[_word][0] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10())
+                        pos += Decimal(
+                            word_ko_dict[_word][1] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()
+                        neg += Decimal(
+                            word_ko_dict[_word][0] / (word_ko_dict[_word][0] + word_ko_dict[_word][1])).log10()
+                print(pos, neg)
+            else:
+                text = document_movie.lower()
+                words = nltk.word_tokenize(document_movie)
+                pair_word_tag_list = nltk.pos_tag(words)
+                pos = prob_pos
+                neg = prob_neg
+                for _word, tag in pair_word_tag_list:
+                    if _word in word_not_ko_dict:
+                        print(_word, Decimal(
+                            word_not_ko_dict[_word][1] / (
+                                        word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10(), Decimal(
+                            word_not_ko_dict[_word][0] / (
+                                        word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10())
+                        pos += Decimal(word_not_ko_dict[_word][1] / (
+                                    word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
+                        neg += Decimal(word_not_ko_dict[_word][0] / (
+                                    word_not_ko_dict[_word][0] + word_not_ko_dict[_word][1])).log10()
+                print(pos, neg)
 
 print(result_cnt)
 print(result_correct)
