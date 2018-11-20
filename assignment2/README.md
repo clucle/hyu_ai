@@ -26,6 +26,9 @@ python3
 >>> nltk.download('punkt')
 >>> nltk.download('averaged_perceptron_tagger')
 
+# execute
+(venv_2014005123) ...$     python3 2014005123_assignment_2.py
+
 ```
 
 2014005123_assignment_2.py 실행하면 
